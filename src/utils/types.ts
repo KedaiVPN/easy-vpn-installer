@@ -23,4 +23,21 @@ export interface InstallationStep {
   name: string;
   status: 'pending' | 'in-progress' | 'completed' | 'error';
   description: string;
+  errorDetails?: string;
+  timestamp?: Date;
+}
+
+export interface SystemLog {
+  timestamp: Date;
+  level: 'info' | 'warning' | 'error';
+  message: string;
+  component: string;
+}
+
+export interface ServiceConfig {
+  name: string;
+  enabled: boolean;
+  port: number;
+  protocols: string[];
+  settings: Record<string, any>;
 }

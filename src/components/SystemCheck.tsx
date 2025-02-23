@@ -1,13 +1,17 @@
 
 import { motion } from "framer-motion";
-import { CheckCircle, AlertCircle, Clock } from "lucide-react";
+import { CheckCircle, AlertCircle, Clock, HardDrive, Cpu, Memory, Network } from "lucide-react";
 import type { SystemRequirement } from "@/utils/types";
 
 const requirements: SystemRequirement[] = [
-  { name: "Root Access", status: "success" },
-  { name: "System Updates", status: "pending" },
-  { name: "Required Packages", status: "success" },
-  { name: "Swap Space", status: "success" },
+  { name: "Root Access", status: "success", details: "User has root privileges" },
+  { name: "System Updates", status: "pending", details: "Checking for system updates..." },
+  { name: "Required Packages", status: "success", details: "All required packages are installed" },
+  { name: "Swap Space", status: "success", details: "1GB swap space available" },
+  { name: "CPU Usage", status: "success", details: "CPU load: 15%" },
+  { name: "Memory Usage", status: "success", details: "Available: 2.5GB/4GB" },
+  { name: "Disk Space", status: "success", details: "Available: 25GB/50GB" },
+  { name: "Network Status", status: "success", details: "Connected (1Gbps)" },
 ];
 
 export const SystemCheck = () => {
@@ -22,9 +26,20 @@ export const SystemCheck = () => {
         {requirements.map((req) => (
           <div
             key={req.name}
-            className="flex items-center justify-between p-3 bg-white rounded border"
+            className="flex items-center justify-between p-3 bg-white rounded border hover:bg-gray-50 transition-colors"
           >
-            <span className="font-mono">{req.name}</span>
+            <div className="flex items-center space-x-3">
+              {req.name.includes("CPU") && <Cpu className="w-4 h-4 text-gray-500" />}
+              {req.name.includes("Memory") && <Memory className="w-4 h-4 text-gray-500" />}
+              {req.name.includes("Disk") && <HardDrive className="w-4 h-4 text-gray-500" />}
+              {req.name.includes("Network") && <Network className="w-4 h-4 text-gray-500" />}
+              <div>
+                <span className="font-mono">{req.name}</span>
+                {req.details && (
+                  <p className="text-sm text-gray-500">{req.details}</p>
+                )}
+              </div>
+            </div>
             {req.status === "success" && (
               <CheckCircle className="text-success w-5 h-5" />
             )}
