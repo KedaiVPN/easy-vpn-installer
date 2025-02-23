@@ -30,7 +30,7 @@ const services: ServiceStatus[] = [
   },
 ];
 
-export const ServiceStatus = () => {
+export const ServiceStatusPanel = () => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}

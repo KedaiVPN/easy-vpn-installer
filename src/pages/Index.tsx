@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 import { SystemCheck } from "@/components/SystemCheck";
 import { InstallProgress } from "@/components/InstallProgress";
-import { ServiceStatus } from "@/components/ServiceStatus";
+import { ServiceStatusPanel } from "@/components/ServiceStatus";
 import { UserManagement } from "@/components/UserManagement";
 import { CloudflareGuide } from "@/components/CloudflareGuide";
 
@@ -22,7 +22,7 @@ const Index = () => {
           <InstallProgress />
         </div>
         <div className="mb-6">
-          <ServiceStatus />
+          <ServiceStatusPanel />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <UserManagement />
