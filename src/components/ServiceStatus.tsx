@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import type { ServiceStatus } from "@/utils/types";
 import { Badge } from "@/components/ui/badge";
 import { Settings2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import {
   Tooltip,
   TooltipContent,
@@ -38,6 +39,16 @@ const services: ServiceStatus[] = [
 ];
 
 export const ServiceStatusPanel = () => {
+  const { toast } = useToast();
+
+  const handleConfigureService = (serviceName: string) => {
+    toast({
+      title: "Configure Service",
+      description: `Opening configuration for ${serviceName}...`,
+      duration: 2000,
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -49,7 +60,10 @@ export const ServiceStatusPanel = () => {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <button className="p-2 hover:bg-gray-100 rounded-full">
+              <button 
+                className="p-2 hover:bg-gray-100 rounded-full"
+                onClick={() => handleConfigureService("all")}
+              >
                 <Settings2 className="w-5 h-5 text-gray-600" />
               </button>
             </TooltipTrigger>

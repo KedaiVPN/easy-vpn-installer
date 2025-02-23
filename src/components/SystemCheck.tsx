@@ -1,6 +1,6 @@
 
 import { motion } from "framer-motion";
-import { CheckCircle, AlertCircle, Clock, HardDrive, Cpu, Memory, Network } from "lucide-react";
+import { CheckCircle, AlertCircle, Clock, HardDrive, Cpu, MemoryStick, Network } from "lucide-react";
 import type { SystemRequirement } from "@/utils/types";
 
 const requirements: SystemRequirement[] = [
@@ -30,7 +30,7 @@ export const SystemCheck = () => {
           >
             <div className="flex items-center space-x-3">
               {req.name.includes("CPU") && <Cpu className="w-4 h-4 text-gray-500" />}
-              {req.name.includes("Memory") && <Memory className="w-4 h-4 text-gray-500" />}
+              {req.name.includes("Memory") && <MemoryStick className="w-4 h-4 text-gray-500" />}
               {req.name.includes("Disk") && <HardDrive className="w-4 h-4 text-gray-500" />}
               {req.name.includes("Network") && <Network className="w-4 h-4 text-gray-500" />}
               <div>
