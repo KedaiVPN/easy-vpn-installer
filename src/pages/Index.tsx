@@ -1,5 +1,5 @@
 
-import { TerminalDashboard } from "@/components/TerminalDashboard";
+import TerminalDashboard from "@/components/TerminalDashboard";
 
 const Index = () => {
   return (
