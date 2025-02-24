@@ -1,69 +1,120 @@
-# Welcome to your Lovable project
 
-## Project info
+# Easy VPN Installer
 
-**URL**: https://lovable.dev/projects/293791d8-5692-476c-b6d1-57dd2a551c96
+Script auto-installer untuk konfigurasi VPN dan proxy multi protokol pada server Linux (Debian/Ubuntu).
 
-## How can I edit this code?
+## Fitur
 
-There are several ways of editing your application.
+- Instalasi dan konfigurasi otomatis Xray Core dengan dukungan:
+  - VLESS (WebSocket, gRPC, TCP)
+  - VMESS (WebSocket, gRPC)
+  - Trojan (WebSocket, gRPC)
+  - Shadowsocks (WebSocket, gRPC)
+- Konfigurasi SSH dengan WebSocket/TLS
+- Pengaturan keamanan (fail2ban, firewall)
+- Optimasi sistem dan kernel
+- Monitoring resource dan log otomatis
+- Backup konfigurasi otomatis
 
-**Use Lovable**
+## Persyaratan Sistem
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/293791d8-5692-476c-b6d1-57dd2a551c96) and start prompting.
+- OS: Debian 10+ atau Ubuntu 18.04+
+- RAM: Minimal 1GB
+- CPU: 1 Core
+- Akses root
 
-Changes made via Lovable will be committed automatically to this repo.
+## Instalasi Cepat
 
-**Use your preferred IDE**
+Salin dan tempelkan perintah berikut ke terminal server Anda:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+apt update -y && apt install -y wget curl screen sudo && \
+wget -q https://raw.githubusercontent.com/KedaiVPN/easy-vpn-installer/main/install.sh && \
+chmod +x install.sh && \
+screen -S install ./install.sh
 ```
 
-**Edit a file directly in GitHub**
+### Penjelasan Langkah Instalasi
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. `apt update -y`
+   - Memperbarui daftar paket sistem
+   - Flag `-y` untuk menyetujui pembaruan secara otomatis
 
-**Use GitHub Codespaces**
+2. `apt install -y wget curl screen sudo`
+   - Menginstal paket-paket yang diperlukan:
+     - wget: untuk mengunduh file
+     - curl: untuk transfer data
+     - screen: untuk menjalankan proses di background
+     - sudo: untuk manajemen hak akses
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3. `wget -q https://raw.githubusercontent.com/KedaiVPN/easy-vpn-installer/main/install.sh`
+   - Mengunduh script installer dari repository
+   - Flag `-q` untuk mode quiet (tanpa output progress)
 
-## What technologies are used for this project?
+4. `chmod +x install.sh`
+   - Memberikan izin eksekusi pada script installer
 
-This project is built with .
+5. `screen -S install ./install.sh`
+   - Menjalankan script di dalam sesi screen bernama "install"
+   - Instalasi akan tetap berjalan meskipun koneksi SSH terputus
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Konfigurasi Manual (Opsional)
 
-## How can I deploy this project?
+Jika Anda ingin menyesuaikan pengaturan sebelum instalasi:
 
-Simply open [Lovable](https://lovable.dev/projects/293791d8-5692-476c-b6d1-57dd2a551c96) and click on Share -> Publish.
+1. Unduh file konfigurasi contoh:
+```bash
+wget -q https://raw.githubusercontent.com/KedaiVPN/easy-vpn-installer/main/config.conf.example -O config.conf
+```
 
-## I want to use a custom domain - is that possible?
+2. Edit file konfigurasi sesuai kebutuhan:
+```bash
+nano config.conf
+```
 
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+3. Jalankan installer:
+```bash
+screen -S install ./install.sh
+```
+
+## Fitur Keamanan
+
+- Fail2ban untuk proteksi dari serangan brute force
+- UFW firewall dengan konfigurasi default yang aman
+- Pembersihan log otomatis setiap 3 menit
+- Optimasi kernel untuk performa dan keamanan
+- Backup konfigurasi otomatis
+
+## Monitoring & Manajemen
+
+- Monitor penggunaan CPU, RAM, dan koneksi
+- Log terstruktur di `/var/log/easy-vpn-installer.log`
+- Backup konfigurasi di `/root/vpn-backup`
+
+## Troubleshooting
+
+Jika terjadi masalah saat instalasi:
+
+1. Cek log instalasi:
+```bash
+tail -f /var/log/easy-vpn-installer.log
+```
+
+2. Untuk melihat sesi screen yang berjalan:
+```bash
+screen -ls
+```
+
+3. Untuk kembali ke sesi instalasi:
+```bash
+screen -r install
+```
+
+## Lisensi
+
+MIT License - Silakan gunakan dan modifikasi sesuai kebutuhan.
+
+## Kontribusi
+
+Kontribusi sangat diterima! Silakan buat pull request atau laporkan issue jika menemukan bug.
+
