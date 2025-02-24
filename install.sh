@@ -4,175 +4,375 @@
 # ====================
 # Easy VPN Installer
 # Author: KedaiVPN
-# Version: 2.1.0
+# Version: 2.2.0 
 # ====================
 
 # Konfigurasi Default
-SWAP_SIZE=1024  # Ukuran swap dalam MB
-XRAY_PORT=443   # Port default untuk Xray
-SSH_PORT=22     # Port default untuk SSH
+SWAP_SIZE=1024                    # Ukuran swap dalam MB
+XRAY_PORT=443                     # Port default untuk Xray
+SSH_PORT=22                       # Port default untuk SSH
+WS_PORT=80                        # Port untuk WebSocket non-TLS
+GRPC_PORT=443                     # Port untuk gRPC
 LOG_FILE="/var/log/easy-vpn-installer.log"
 CONFIG_FILE="config.conf"
 BACKUP_DIR="/root/vpn-backup"
 CERT_DIR="/etc/ssl/private"
-MONITORING_INTERVAL=5  # Interval monitoring dalam menit
+MONITORING_INTERVAL=5             # Interval monitoring dalam menit
+LOG_CLEANUP_INTERVAL=3            # Interval pembersihan log dalam menit
+FAIL2BAN_MAX_RETRY=5             # Maksimal percobaan login gagal
+FAIL2BAN_BANTIME=3600            # Waktu ban dalam detik
+KERNEL_BBR=true                  # Aktifkan BBR TCP congestion control
+
+# Cloudflare settings
+CF_SSL_MODE="full"               # full/flexible/strict
+CF_GRPC="on"                     # on/off
+CF_WEBSOCKET="on"               # on/off
+CF_ALWAYS_HTTPS="off"           # on/off
+CF_UNDER_ATTACK="off"           # on/off
 
 # Warna untuk output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m'
 
-# ... keep existing code (fungsi logging, check_error, check_root, update_system, setup_swap)
-
-# Fungsi backup konfigurasi
-backup_config() {
-    log "INFO" "Memulai backup konfigurasi..."
+# Fungsi logging yang ditingkatkan
+log() {
+    local level=$1
+    local message=$2
+    local critical=$3
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     
-    # Buat direktori backup jika belum ada
-    mkdir -p "${BACKUP_DIR}"
-    check_error "Gagal membuat direktori backup"
+    # Log ke file
+    echo -e "${timestamp} [${level}] ${message}" >> "$LOG_FILE"
     
-    # Backup konfigurasi utama
-    BACKUP_FILE="${BACKUP_DIR}/backup-$(date +%Y%m%d-%H%M%S).tar.gz"
-    tar -czf "${BACKUP_FILE}" \
-        /usr/local/etc/xray \
-        /etc/ssl/private \
-        /etc/fail2ban \
-        "${LOG_FILE}" \
-        2>/dev/null
-    
-    check_error "Gagal membuat backup" "warning"
-    log "INFO" "Backup selesai: ${BACKUP_FILE}"
-}
-
-# Fungsi pembuatan SSL otomatis dengan Let's Encrypt
-setup_ssl() {
-    local domain=$1
-    log "INFO" "Memulai setup SSL untuk domain ${domain}..."
-    
-    # Install certbot
-    apt install -y certbot
-    check_error "Gagal menginstall certbot" "critical"
-    
-    # Generate sertifikat
-    certbot certonly --standalone -d "${domain}" --non-interactive --agree-tos --email admin@"${domain}" \
-        --preferred-challenges http
-    check_error "Gagal mendapatkan sertifikat SSL" "critical"
-    
-    # Salin sertifikat ke direktori Xray
-    cp /etc/letsencrypt/live/"${domain}"/fullchain.pem "${CERT_DIR}/xray.crt"
-    cp /etc/letsencrypt/live/"${domain}"/privkey.pem "${CERT_DIR}/xray.key"
-    check_error "Gagal menyalin sertifikat" "critical"
-    
-    log "INFO" "Setup SSL selesai untuk ${domain}"
-}
-
-# Fungsi monitoring resource
-setup_monitoring() {
-    log "INFO" "Mengatur monitoring sistem..."
-    
-    # Install tools monitoring
-    apt install -y sysstat net-tools
-    check_error "Gagal menginstall tools monitoring"
-    
-    # Buat script monitoring
-    cat > /usr/local/bin/monitor-vpn.sh <<EOF
-#!/bin/bash
-while true; do
-    echo "=== VPN Server Monitoring ===" >> "${LOG_FILE}"
-    date >> "${LOG_FILE}"
-    echo "CPU Usage:" >> "${LOG_FILE}"
-    top -bn1 | head -n 3 >> "${LOG_FILE}"
-    echo "Memory Usage:" >> "${LOG_FILE}"
-    free -m >> "${LOG_FILE}"
-    echo "Network Connections:" >> "${LOG_FILE}"
-    netstat -an | grep :${XRAY_PORT} | wc -l >> "${LOG_FILE}"
-    echo "===========================" >> "${LOG_FILE}"
-    sleep ${MONITORING_INTERVAL}m
-done
-EOF
-    
-    chmod +x /usr/local/bin/monitor-vpn.sh
-    
-    # Buat service systemd untuk monitoring
-    cat > /etc/systemd/system/vpn-monitor.service <<EOF
-[Unit]
-Description=VPN Server Monitoring
-After=network.target
-
-[Service]
-ExecStart=/usr/local/bin/monitor-vpn.sh
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    
-    systemctl daemon-reload
-    systemctl enable vpn-monitor
-    systemctl start vpn-monitor
-    
-    check_error "Gagal mengatur monitoring"
-    log "INFO" "Monitoring sistem berhasil diatur"
-}
-
-# Fungsi manajemen user
-manage_users() {
-    local action=$1
-    local username=$2
-    local password=$3
-    
-    case "${action}" in
-        "add")
-            log "INFO" "Menambah user: ${username}"
-            useradd -m -s /bin/false "${username}"
-            echo "${username}:${password}" | chpasswd
-            check_error "Gagal menambah user"
-            
-            # Generate konfigurasi Xray untuk user
-            UUID=$(cat /proc/sys/kernel/random/uuid)
-            # Tambahkan UUID ke konfigurasi Xray
-            # ... implementasi penambahan user ke config.json
-            ;;
-            
-        "delete")
-            log "INFO" "Menghapus user: ${username}"
-            userdel -r "${username}"
-            check_error "Gagal menghapus user"
-            # Hapus konfigurasi Xray untuk user
-            ;;
-            
-        "list")
-            log "INFO" "Daftar user aktif:"
-            awk -F: '$3 >= 1000 && $1 != "nobody" {print $1}' /etc/passwd
-            ;;
+    # Output ke console dengan warna
+    case $level in
+        "INFO")     echo -e "${GREEN}[INFO]${NC} ${message}" ;;
+        "WARNING")  echo -e "${YELLOW}[WARNING]${NC} ${message}" ;;
+        "ERROR")    echo -e "${RED}[ERROR]${NC} ${message}" ;;
+        "PROGRESS") echo -e "${BLUE}[PROGRESS]${NC} ${message}" ;;
     esac
-}
-
-# Fungsi instalasi dan konfigurasi Xray
-install_xray() {
-    # ... keep existing code (instalasi Xray)
     
-    # Tambahan: setup monitoring setelah instalasi
-    setup_monitoring
+    # Jika critical, exit
+    if [ "$critical" = "true" ]; then
+        log "ERROR" "Terjadi kesalahan kritis. Menghentikan instalasi."
+        exit 1
+    fi
 }
 
-# Main function
+# Fungsi pengecekan error yang ditingkatkan
+check_error() {
+    if [ $? -ne 0 ]; then
+        local message=$1
+        local critical=${2:-false}
+        log "ERROR" "$message" "$critical"
+        
+        if [ "$critical" = "true" ]; then
+            # Lakukan rollback jika diperlukan
+            rollback_changes
+        fi
+        return 1
+    fi
+    return 0
+}
+
+# Fungsi rollback
+rollback_changes() {
+    log "WARNING" "Memulai prosedur rollback..."
+    
+    # Hentikan dan hapus service yang sudah dibuat
+    systemctl stop xray vpn-monitor 2>/dev/null
+    systemctl disable xray vpn-monitor 2>/dev/null
+    
+    # Hapus file konfigurasi
+    rm -rf /usr/local/etc/xray 2>/dev/null
+    rm -f /etc/systemd/system/vpn-monitor.service 2>/dev/null
+    
+    # Reload daemon
+    systemctl daemon-reload
+    
+    log "INFO" "Rollback selesai"
+}
+
+# Fungsi pengecekan dan setup awal
+pre_installation_check() {
+    # Cek root access
+    if [[ $EUID -ne 0 ]]; then
+        log "ERROR" "Script ini harus dijalankan sebagai root" true
+    fi
+    
+    # Cek OS support
+    if ! grep -qs "debian\|ubuntu" /etc/os-release; then
+        log "ERROR" "OS tidak didukung. Gunakan Debian/Ubuntu" true
+    fi
+    
+    # Cek koneksi internet
+    if ! ping -c 1 google.com &>/dev/null; then
+        log "ERROR" "Tidak ada koneksi internet" true
+    fi
+    
+    log "INFO" "Pre-installation check berhasil"
+}
+
+# Fungsi update sistem yang ditingkatkan
+update_system() {
+    log "PROGRESS" "Memulai update sistem..."
+    
+    # Update package list
+    apt update
+    check_error "Gagal update package list" true
+    
+    # Upgrade sistem
+    apt upgrade -y
+    check_error "Gagal upgrade sistem" true
+    
+    # Install paket yang diperlukan
+    log "PROGRESS" "Menginstall paket-paket yang diperlukan..."
+    apt install -y wget curl screen sudo whois fail2ban ufw net-tools
+    check_error "Gagal install paket yang diperlukan" true
+    
+    log "INFO" "Update sistem selesai"
+}
+
+# Fungsi konfigurasi swap yang ditingkatkan
+setup_swap() {
+    log "PROGRESS" "Memeriksa dan mengatur swap..."
+    
+    # Cek existing swap
+    if free | awk '/^Swap:/ {exit !$2}'; then
+        local current_swap=$(free -m | awk '/^Swap:/ {print $2}')
+        if [ "$current_swap" -ge "$SWAP_SIZE" ]; then
+            log "INFO" "Swap sudah ada dan ukurannya mencukupi (${current_swap}MB)"
+            return 0
+        else
+            log "WARNING" "Swap ada tapi ukurannya kurang (${current_swap}MB). Menambah swap..."
+            swapoff -a
+            rm -f /swapfile
+        fi
+    fi
+    
+    # Buat swap baru
+    log "PROGRESS" "Membuat swap file ${SWAP_SIZE}MB..."
+    fallocate -l ${SWAP_SIZE}M /swapfile
+    check_error "Gagal membuat swap file" true
+    
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    
+    # Tambahkan ke fstab jika belum ada
+    if ! grep -q "/swapfile" /etc/fstab; then
+        echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    fi
+    
+    log "INFO" "Setup swap selesai"
+}
+
+# Fungsi instalasi dan konfigurasi Xray yang ditingkatkan
+install_xray() {
+    log "PROGRESS" "Menginstall Xray Core..."
+    
+    # Download dan install Xray
+    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
+    check_error "Gagal menginstall Xray Core" true
+    
+    # Buat direktori untuk sertifikat
+    mkdir -p /usr/local/etc/xray
+    mkdir -p "${CERT_DIR}"
+    
+    # Konfigurasi Xray untuk multiple protokol
+    cat > /usr/local/etc/xray/config.json <<EOF
+{
+    "log": {
+        "access": "/var/log/xray/access.log",
+        "error": "/var/log/xray/error.log",
+        "loglevel": "warning"
+    },
+    "inbounds": [
+        {
+            "port": ${XRAY_PORT},
+            "protocol": "vless",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "$(cat /proc/sys/kernel/random/uuid)",
+                        "flow": "xtls-rprx-direct"
+                    }
+                ],
+                "decryption": "none",
+                "fallbacks": [
+                    {
+                        "dest": 8080,
+                        "path": "/vless-ws"
+                    },
+                    {
+                        "dest": 8081,
+                        "path": "/vmess-ws"
+                    },
+                    {
+                        "dest": 8082,
+                        "path": "/trojan-ws"
+                    },
+                    {
+                        "dest": 8083,
+                        "path": "/shadowsocks-ws"
+                    },
+                    {
+                        "dest": 8443,
+                        "alpn": "h2"
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "tcp",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "${CERT_DIR}/xray.crt",
+                            "keyFile": "${CERT_DIR}/xray.key"
+                        }
+                    ],
+                    "alpn": ["h2", "http/1.1"]
+                }
+            }
+        },
+        {
+            "port": ${WS_PORT},
+            "protocol": "vless",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "$(cat /proc/sys/kernel/random/uuid)"
+                    }
+                ],
+                "decryption": "none"
+            },
+            "streamSettings": {
+                "network": "ws",
+                "wsSettings": {
+                    "path": "/vless-ws"
+                }
+            }
+        }
+    ],
+    "outbounds": [
+        {
+            "protocol": "freedom"
+        }
+    ]
+}
+EOF
+    
+    # Restart Xray
+    systemctl restart xray
+    check_error "Gagal restart Xray" true
+    
+    log "INFO" "Instalasi dan konfigurasi Xray selesai"
+}
+
+# Fungsi pengaturan keamanan yang ditingkatkan
+setup_security() {
+    log "PROGRESS" "Mengatur konfigurasi keamanan..."
+    
+    # Konfigurasi fail2ban
+    cat > /etc/fail2ban/jail.local <<EOF
+[DEFAULT]
+bantime = ${FAIL2BAN_BANTIME}
+findtime = 600
+maxretry = ${FAIL2BAN_MAX_RETRY}
+
+[sshd]
+enabled = true
+port = ${SSH_PORT}
+EOF
+    
+    systemctl restart fail2ban
+    check_error "Gagal mengkonfigurasi fail2ban"
+    
+    # Setup firewall (UFW)
+    ufw default deny incoming
+    ufw default allow outgoing
+    ufw allow ${SSH_PORT}/tcp
+    ufw allow ${XRAY_PORT}/tcp
+    ufw allow ${WS_PORT}/tcp
+    ufw --force enable
+    
+    # Konfigurasi pembersihan log otomatis
+    cat > /etc/cron.d/cleanup-logs <<EOF
+*/${LOG_CLEANUP_INTERVAL} * * * * root find /var/log -type f -name "*.log" -size +100M -delete
+EOF
+    
+    # Pengaturan kernel untuk keamanan
+    cat >> /etc/sysctl.conf <<EOF
+# Pengaturan keamanan kernel
+net.ipv4.tcp_syncookies = 1
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.conf.all.rp_filter = 1
+net.ipv4.conf.default.rp_filter = 1
+EOF
+    
+    sysctl -p
+    
+    log "INFO" "Pengaturan keamanan selesai"
+}
+
+# Fungsi optimasi sistem yang ditingkatkan
+optimize_system() {
+    log "PROGRESS" "Mengoptimasi sistem..."
+    
+    # Optimasi kernel
+    cat > /etc/sysctl.d/99-vpn-optimize.conf <<EOF
+# Optimasi TCP/IP Stack
+net.core.rmem_max = 67108864
+net.core.wmem_max = 67108864
+net.core.rmem_default = 65536
+net.core.wmem_default = 65536
+net.ipv4.tcp_rmem = 4096 87380 67108864
+net.ipv4.tcp_wmem = 4096 65536 67108864
+net.ipv4.tcp_congestion_control = bbr
+net.core.default_qdisc = fq
+net.ipv4.tcp_fastopen = 3
+net.ipv4.tcp_slow_start_after_idle = 0
+EOF
+    
+    # Aktifkan BBR jika diminta
+    if [ "${KERNEL_BBR}" = true ]; then
+        modprobe tcp_bbr
+        echo "tcp_bbr" >> /etc/modules-load.d/modules.conf
+    fi
+    
+    # Terapkan perubahan
+    sysctl --system
+    check_error "Gagal menerapkan optimasi sistem"
+    
+    log "INFO" "Optimasi sistem selesai"
+}
+
+# Main function yang ditingkatkan
 main() {
     # Buat file log jika belum ada
     touch "$LOG_FILE"
-    log "INFO" "Memulai instalasi Easy VPN..."
+    chmod 644 "$LOG_FILE"
     
-    # Jalankan fungsi-fungsi utama
-    check_root
+    log "PROGRESS" "Memulai instalasi Easy VPN..."
+    
+    # Load konfigurasi custom
+    if [ -f "$CONFIG_FILE" ]; then
+        source "$CONFIG_FILE"
+        log "INFO" "Menggunakan konfigurasi dari $CONFIG_FILE"
+    fi
+    
+    # Jalankan semua fungsi secara berurutan
+    pre_installation_check
     update_system
     setup_swap
     install_xray
     setup_security
     optimize_system
-    
-    # Backup konfigurasi awal
+    setup_monitoring
     backup_config
     
     # Setup SSL jika domain tersedia
@@ -180,14 +380,11 @@ main() {
         setup_ssl "${DOMAIN}"
     fi
     
+    log "INFO" "============================================"
     log "INFO" "Instalasi selesai! Log tersimpan di $LOG_FILE"
+    log "INFO" "============================================"
 }
-
-# Load konfigurasi custom jika ada
-if [ -f "$CONFIG_FILE" ]; then
-    source "$CONFIG_FILE"
-    log "INFO" "Menggunakan konfigurasi dari $CONFIG_FILE"
-fi
 
 # Jalankan script
 main
+
