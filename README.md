@@ -18,7 +18,7 @@ Script auto-installer untuk konfigurasi VPN dan proxy multi protokol pada server
 
 ## Persyaratan Sistem
 
-- OS: Debian 10+ atau Ubuntu 18.04+
+- OS: Debian 10-12 atau Ubuntu 20.04.05-24.04
 - RAM: Minimal 1GB
 - CPU: 1 Core
 - Akses root
