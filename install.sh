@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 # ====================
@@ -11,7 +10,7 @@
 SWAP_SIZE=1024                    # Ukuran swap dalam MB
 XRAY_PORT=443                     # Port default untuk Xray
 SSH_PORT=22                       # Port default untuk SSH
-WS_PORT=80                        # Port untuk WebSocket non-TLS
+WS_PORT=80                       # Port untuk WebSocket non-TLS
 GRPC_PORT=443                     # Port untuk gRPC
 LOG_FILE="/var/log/easy-vpn-installer.log"
 CONFIG_FILE="config.conf"
@@ -62,38 +61,36 @@ log() {
     fi
 }
 
-# Fungsi pengecekan error yang ditingkatkan
-check_error() {
-    if [ $? -ne 0 ]; then
-        local message=$1
-        local critical=${2:-false}
-        log "ERROR" "$message" "$critical"
-        
-        if [ "$critical" = "true" ]; then
-            # Lakukan rollback jika diperlukan
-            rollback_changes
-        fi
-        return 1
+# Fungsi untuk memeriksa versi OS yang didukung
+check_os_support() {
+    # Deteksi OS dan versi
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$ID
+        VER=$VERSION_ID
+    else
+        log "ERROR" "Tidak dapat mendeteksi sistem operasi" true
     fi
-    return 0
-}
 
-# Fungsi rollback
-rollback_changes() {
-    log "WARNING" "Memulai prosedur rollback..."
-    
-    # Hentikan dan hapus service yang sudah dibuat
-    systemctl stop xray vpn-monitor 2>/dev/null
-    systemctl disable xray vpn-monitor 2>/dev/null
-    
-    # Hapus file konfigurasi
-    rm -rf /usr/local/etc/xray 2>/dev/null
-    rm -f /etc/systemd/system/vpn-monitor.service 2>/dev/null
-    
-    # Reload daemon
-    systemctl daemon-reload
-    
-    log "INFO" "Rollback selesai"
+    # Cek Ubuntu
+    if [ "$OS" = "ubuntu" ]; then
+        if [[ "$VER" == "20.04" || "$VER" == "22.04" || "$VER" == "23.04" || "$VER" == "23.10" || "$VER" == "24.04" ]]; then
+            log "INFO" "Terdeteksi Ubuntu $VER - Versi yang didukung"
+            return 0
+        else
+            log "ERROR" "Ubuntu $VER tidak didukung. Hanya mendukung versi 20.04.05 - 24.04" true
+        fi
+    # Cek Debian
+    elif [ "$OS" = "debian" ]; then
+        if [[ "$VER" == "10" || "$VER" == "11" || "$VER" == "12" ]]; then
+            log "INFO" "Terdeteksi Debian $VER - Versi yang didukung"
+            return 0
+        else
+            log "ERROR" "Debian $VER tidak didukung. Hanya mendukung versi 10 - 12" true
+        fi
+    else
+        log "ERROR" "Sistem operasi $OS tidak didukung. Hanya mendukung Ubuntu dan Debian" true
+    fi
 }
 
 # Fungsi pengecekan dan setup awal
@@ -104,9 +101,7 @@ pre_installation_check() {
     fi
     
     # Cek OS support
-    if ! grep -qs "debian\|ubuntu" /etc/os-release; then
-        log "ERROR" "OS tidak didukung. Gunakan Debian/Ubuntu" true
-    fi
+    check_os_support
     
     # Cek koneksi internet
     if ! ping -c 1 google.com &>/dev/null; then
@@ -387,4 +382,3 @@ main() {
 
 # Jalankan script
 main
-
