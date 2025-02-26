@@ -29,6 +29,14 @@ interface ServiceStatus {
   xrayAccounts: number;
 }
 
+interface Account {
+  username: string;
+  type: "ssh" | "vmess" | "vless" | "trojan";
+  created: string;
+  expired: string;
+  bandwidth: string;
+}
+
 const TerminalDashboard = () => {
   const [systemInfo, setSystemInfo] = useState<SystemInfo>({
     client: "kedai_vpn",
@@ -56,13 +64,106 @@ const TerminalDashboard = () => {
     xrayAccounts: 11,
   });
 
-  const menuItems = [
-    ["SSH/OPENVPN", "ADMIN MENU"],
-    ["XRAY MANAGER", "BOT TELEGRAM"],
-    ["ADD BUG CONFIG", "UPDATE SCRIPT"],
-    ["CHANGE WARNA", "BACKUP & RESTORE"],
-    ["REGISTER IP", "FEATURES"],
-  ];
+  const [currentMenu, setCurrentMenu] = useState("main");
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [selectedAccountType, setSelectedAccountType] = useState<"ssh" | "vmess" | "vless" | "trojan">("ssh");
+  const [inputValue, setInputValue] = useState("");
+
+  const handleMenuSelect = (option: string) => {
+    switch (option) {
+      case "1":
+        setCurrentMenu("ssh");
+        setSelectedAccountType("ssh");
+        break;
+      case "2":
+        setCurrentMenu("xray");
+        break;
+      case "3":
+        setCurrentMenu("bug");
+        break;
+      case "x":
+        setCurrentMenu("main");
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleCreateAccount = () => {
+    if (!inputValue) return;
+
+    const newAccount: Account = {
+      username: inputValue,
+      type: selectedAccountType,
+      created: new Date().toLocaleDateString(),
+      expired: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      bandwidth: "0 GB",
+    };
+
+    setAccounts([...accounts, newAccount]);
+    setInputValue("");
+  };
+
+  const renderMainMenu = () => (
+    <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="col-span-2 grid grid-cols-2 gap-2">
+        <div className="cursor-pointer hover:bg-gray-800 p-1 text-green-400">(1) SSH/OPENVPN MANAGER</div>
+        <div className="cursor-pointer hover:bg-gray-800 p-1 text-green-400">(2) XRAY MANAGER</div>
+      </div>
+      <div className="col-span-2 grid grid-cols-2 gap-2">
+        <div className="cursor-pointer hover:bg-gray-800 p-1 text-yellow-400">(3) CONFIG BUG/SNI</div>
+        <div className="cursor-pointer hover:bg-gray-800 p-1">(x) EXIT</div>
+      </div>
+    </div>
+  );
+
+  const renderAccountMenu = () => (
+    <div className="space-y-4">
+      <div className="text-green-400 text-center border-b border-green-500 pb-2">
+        [ {selectedAccountType.toUpperCase()} ACCOUNT MANAGER ]
+      </div>
+      
+      <div className="space-y-2">
+        <div>Create New Account:</div>
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          className="bg-gray-900 border border-green-500 p-1 w-full text-green-400"
+          placeholder="Enter username"
+        />
+        <button
+          onClick={handleCreateAccount}
+          className="bg-green-600 text-white px-4 py-1 rounded hover:bg-green-700"
+        >
+          Create
+        </button>
+      </div>
+
+      <div className="space-y-2">
+        <div className="text-green-400">Active Accounts:</div>
+        <div className="space-y-1">
+          {accounts
+            .filter(account => account.type === selectedAccountType)
+            .map((account, index) => (
+              <div key={index} className="flex justify-between border-b border-gray-700 pb-1">
+                <span>{account.username}</span>
+                <span className="text-yellow-400">{account.expired}</span>
+              </div>
+            ))}
+        </div>
+      </div>
+
+      <div className="text-center">
+        <button
+          onClick={() => setCurrentMenu("main")}
+          className="text-red-400 hover:text-red-300"
+        >
+          Back to Main Menu (x)
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <motion.div
@@ -118,25 +219,22 @@ const TerminalDashboard = () => {
         </div>
       </div>
 
-      {/* Menu Options */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        {menuItems.map((row, i) => (
-          <div key={i} className="col-span-2 grid grid-cols-2 gap-2">
-            {row.map((item, j) => (
-              <div key={j} className="cursor-pointer hover:bg-gray-800 p-1">
-                ({i * 2 + j + 1}) {item}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+      {/* Menu Content */}
+      {currentMenu === "main" ? renderMainMenu() : renderAccountMenu()}
 
       {/* Footer */}
       <div className="text-center border-t border-blue-500 pt-2">
-        <div className="text-red-400">[ REBOOT SYSTEM ]</div>
-        <div className="text-white">[ EXIT ]</div>
         <div className="text-green-400 mt-2">Kesuksesan lahir dari keputusan untuk terus maju.</div>
-        <div className="mt-2">Select From option [1/10 or x] : <span className="animate-pulse">_</span></div>
+        <div className="mt-2">
+          Select From option [1-3 or x] : 
+          <input
+            type="text"
+            className="bg-transparent border-none outline-none w-8 text-green-400 ml-1"
+            value={inputValue}
+            onChange={(e) => handleMenuSelect(e.target.value.toLowerCase())}
+          />
+          <span className="animate-pulse">_</span>
+        </div>
       </div>
     </motion.div>
   );
