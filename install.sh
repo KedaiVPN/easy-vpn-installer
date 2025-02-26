@@ -346,6 +346,91 @@ EOF
     log "INFO" "Optimasi sistem selesai"
 }
 
+# Fungsi untuk setup dashboard web
+setup_dashboard() {
+    log "PROGRESS" "Menginstall dan mengkonfigurasi dashboard web..."
+    
+    # Buat direktori untuk dashboard
+    mkdir -p /var/www/html/dashboard
+    
+    # Install dependencies yang diperlukan
+    apt install -y nodejs npm
+    
+    # Setup API endpoint untuk komunikasi dengan dashboard
+    cat > /etc/nginx/conf.d/dashboard-api.conf <<EOF
+server {
+    listen 8080;
+    server_name localhost;
+
+    location /api {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+}
+EOF
+
+    # Buat service untuk API backend
+    cat > /etc/systemd/system/vpn-dashboard.service <<EOF
+[Unit]
+Description=VPN Dashboard API Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/html/dashboard
+ExecStart=/usr/bin/node server.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Buat script untuk mengupdate informasi sistem
+    cat > /usr/local/bin/update-dashboard-info <<EOF
+#!/bin/bash
+
+# Update system info
+memory_info=\$(free -m | awk '/Mem:/ {print \$2}')
+uptime_info=\$(uptime -p)
+bandwidth_info=\$(vnstat -h 1 | tail -n 1)
+
+# Write to status file
+cat > /var/www/html/dashboard/status.json <<INNER_EOF
+{
+    "systemInfo": {
+        "ram": "\${memory_info} MB",
+        "uptime": "\${uptime_info}",
+        "bandwidth": "\${bandwidth_info}"
+    },
+    "services": {
+        "ssh": \$(systemctl is-active ssh >/dev/null 2>&1 && echo true || echo false),
+        "nginx": \$(systemctl is-active nginx >/dev/null 2>&1 && echo true || echo false),
+        "xray": \$(systemctl is-active xray >/dev/null 2>&1 && echo true || echo false)
+    }
+}
+INNER_EOF
+EOF
+
+    # Buat executable
+    chmod +x /usr/local/bin/update-dashboard-info
+    
+    # Tambahkan ke crontab untuk update regular
+    (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/local/bin/update-dashboard-info") | crontab -
+
+    # Start dan enable services
+    systemctl daemon-reload
+    systemctl enable vpn-dashboard
+    systemctl start vpn-dashboard
+    systemctl restart nginx
+
+    log "INFO" "Dashboard web berhasil dikonfigurasi"
+}
+
 # Main function yang ditingkatkan
 main() {
     # Buat file log jika belum ada
@@ -375,8 +460,12 @@ main() {
         setup_ssl "${DOMAIN}"
     fi
     
+    # Tambahkan setup dashboard setelah semua konfigurasi dasar
+    setup_dashboard
+    
     log "INFO" "============================================"
     log "INFO" "Instalasi selesai! Log tersimpan di $LOG_FILE"
+    log "INFO" "Dashboard tersedia di: http://IP:8080/dashboard"
     log "INFO" "============================================"
 }
 
