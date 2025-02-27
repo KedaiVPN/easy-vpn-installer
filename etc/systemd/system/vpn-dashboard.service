@@ -1,0 +1,14 @@
+
+[Unit]
+Description=VPN Dashboard API Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/html/dashboard
+ExecStart=/usr/bin/node /var/www/html/dashboard/server.js
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
